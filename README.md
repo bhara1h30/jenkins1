@@ -565,3 +565,77 @@ If you want:
 👉 Viva Q&A (🔥 very important)
 👉 One-page record writing format
 
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE = "iambhara1h/html-app:latest"
+    }
+
+    stages {
+
+        stage('Clone Code') {
+            steps {
+                git branch: 'main',
+                url: 'https://github.com/bhara1h30/html.git'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                bat 'docker build -t %DOCKER_IMAGE% .'
+            }
+        }
+
+        stage('Push Image') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'USER',
+                    passwordVariable: 'PASS'
+                )]) {
+                    bat '''
+                    echo %PASS% | docker login -u %USER% --password-stdin
+                    docker push %DOCKER_IMAGE%
+                    '''
+                }
+            }
+        }
+
+
+    }
+}
+DEPLOYMENT:
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: html-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: html-app
+  template:
+    metadata:
+      labels:
+        app: html-app
+    spec:
+      containers:
+      - name: html-app
+        image: iambhara1h/html-app:latest
+        ports:
+        - containerPort: 80
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: html-service
+spec:
+  type: NodePort
+  selector:
+    app: html-app
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30007
